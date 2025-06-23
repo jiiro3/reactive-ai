@@ -43,58 +43,64 @@ export class GeminiProvider implements AIProvider {
     }
   }
 
-  async *stream(params: StreamParams): AsyncIterable<StreamChunk> {
-    if (!this.genAI) {
-      throw new Error('Gemini client not initialized');
-    }
-
-    const {
-      messages,
-      model = this.config.defaultModel,
-      temperature = 0.7,
-      maxTokens,
-      ...otherParams
-    } = params;
-
-    try {
-      const genModel = this.genAI.getGenerativeModel({
-        model,
-        safetySettings: this.config.safetySettings,
-        generationConfig: {
-          temperature,
-          maxOutputTokens: maxTokens,
-          ...this.config.generationConfig,
-          ...otherParams
-        }
-      });
-
-      // Convert messages to Gemini format
-      const prompt = this.convertMessagesToPrompt(messages);
-      
-      const result = await genModel.generateContentStream(prompt);
-
-      for await (const chunk of result.stream) {
-        const text = chunk.text();
-        
-        yield {
-          content: text,
-          done: false,
-          metadata: {
-            model,
-            candidates: chunk.candidates
-          }
-        };
+  async stream(params: StreamParams): Promise<AsyncIterable<StreamChunk>> {
+    const self = this;
+    
+    async function* generateStream(): AsyncIterable<StreamChunk> {
+      if (!self.genAI) {
+        throw new Error('Gemini client not initialized');
       }
 
-      // Final chunk to indicate completion
-      yield {
-        content: '',
-        done: true,
-        metadata: { model }
-      };
-    } catch (error) {
-      throw new Error(`Gemini streaming failed: ${error.message}`);
+      const {
+        messages,
+        model = self.config.defaultModel,
+        temperature = 0.7,
+        maxTokens,
+        ...otherParams
+      } = params;
+
+      try {
+        const genModel = self.genAI.getGenerativeModel({
+          model,
+          safetySettings: self.config.safetySettings,
+          generationConfig: {
+            temperature,
+            maxOutputTokens: maxTokens,
+            ...self.config.generationConfig,
+            ...otherParams
+          }
+        });
+
+        // Convert messages to Gemini format
+        const prompt = self.convertMessagesToPrompt(messages);
+        
+        const result = await genModel.generateContentStream(prompt);
+
+        for await (const chunk of result.stream) {
+          const text = chunk.text();
+          
+          yield {
+            content: text,
+            done: false,
+            metadata: {
+              model,
+              candidates: chunk.candidates
+            }
+          };
+        }
+
+        // Final chunk to indicate completion
+        yield {
+          content: '',
+          done: true,
+          metadata: { model }
+        };
+      } catch (error: any) {
+        throw new Error(`Gemini streaming failed: ${error.message}`);
+      }
     }
+    
+    return generateStream();
   }
 
   async complete(params: CompleteParams): Promise<string> {
