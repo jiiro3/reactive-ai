@@ -1,0 +1,65 @@
+{
+  "name": "@reactive-ai/providers",
+  "version": "0.1.0",
+  "description": "AI provider implementations for reactive AI SDK",
+  "main": "dist/index.js",
+  "module": "dist/index.esm.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.esm.js",
+      "require": "./dist/index.js"
+    },
+    "./openai": {
+      "types": "./dist/openai.d.ts",
+      "import": "./dist/openai.esm.js",
+      "require": "./dist/openai.js"
+    },
+    "./gemini": {
+      "types": "./dist/gemini.d.ts",
+      "import": "./dist/gemini.esm.js",
+      "require": "./dist/gemini.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "rollup -c",
+    "dev": "rollup -c --watch",
+    "test": "vitest",
+    "typecheck": "tsc --noEmit"
+  },
+  "keywords": [
+    "ai",
+    "openai",
+    "gemini",
+    "providers",
+    "streaming"
+  ],
+  "author": "Jiiro",
+  "license": "MIT",
+  "dependencies": {
+    "@reactive-ai/core": "^0.1.0"
+  },
+  "peerDependencies": {
+    "openai": ">=4.0.0",
+    "@google/generative-ai": ">=0.1.0"
+  },
+  "peerDependenciesMeta": {
+    "openai": {
+      "optional": true
+    },
+    "@google/generative-ai": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "@google/generative-ai": "^0.15.0",
+    "@rollup/plugin-typescript": "^11.0.0",
+    "openai": "^4.0.0",
+    "rollup": "^4.0.0",
+    "typescript": "^5.0.0"
+  }
+}

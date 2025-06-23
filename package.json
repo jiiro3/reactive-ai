@@ -1,0 +1,41 @@
+{
+  "name": "reactive-ai-sdk",
+  "version": "0.1.0",
+  "description": "React to state changes with streaming AI responses",
+  "keywords": [
+    "react",
+    "ai",
+    "streaming",
+    "openai",
+    "gemini",
+    "state-management",
+    "real-time"
+  ],
+  "author": "Jiiro",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/jiiro3/reactive-ai-sdk.git"
+  },
+  "workspaces": [
+    "packages/*"
+  ],
+  "scripts": {
+    "build": "npm run build --workspaces",
+    "test": "npm run test --workspaces",
+    "dev": "npm run dev --workspaces",
+    "lint": "eslint packages/*/src/**/*.{ts,tsx}",
+    "typecheck": "npm run typecheck --workspaces"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "@typescript-eslint/eslint-plugin": "^6.0.0",
+    "@typescript-eslint/parser": "^6.0.0",
+    "eslint": "^8.0.0",
+    "typescript": "^5.0.0",
+    "vitest": "^1.0.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
