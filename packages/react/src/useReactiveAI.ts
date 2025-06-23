@@ -12,7 +12,11 @@ export function useReactiveAI<T = any>(
   const [isReady, setIsReady] = useState(false);
   const [isExecuting, setIsExecuting] = useState(false);
   const [lastError, setLastError] = useState<Error | null>(null);
+  const [isIdle, setIsIdle] = useState(false);
   const previousWatchRef = useRef<T[]>();
+  const idleTimerRef = useRef<NodeJS.Timeout>();
+  const idleIntervalRef = useRef<NodeJS.Timeout>();
+  const lastActivityRef = useRef<number>(Date.now());
 
   // Get current watch values
   const getCurrentWatchValues = useCallback((): T[] => {
@@ -70,6 +74,56 @@ export function useReactiveAI<T = any>(
     // Check if values have changed
     if (previousValues && !deepEqual(previousValues, currentValues)) {
       engineRef.current.updateState(currentValues);
+      
+      // Reset idle timer on activity
+      lastActivityRef.current = Date.now();
+      setIsIdle(false);
+      
+      if (config.idle) {
+        // Clear existing idle timer
+        if (idleTimerRef.current) {
+          clearTimeout(idleTimerRef.current);
+        }
+        if (idleIntervalRef.current) {
+          clearInterval(idleIntervalRef.current);
+        }
+        
+        // Set new idle timer
+        idleTimerRef.current = setTimeout(() => {
+          setIsIdle(true);
+          
+          // Execute idle action
+          const executeIdleAction = async () => {
+            if (!isExecuting && engineRef.current) {
+              try {
+                setIsExecuting(true);
+                await config.idle!.action.execute({
+                  state: getCurrentWatchValues(),
+                  providers: config.providers,
+                  previousState: previousWatchRef.current || []
+                });
+              } catch (error) {
+                setLastError(error as Error);
+                config.onError?.(error as Error, {
+                  state: getCurrentWatchValues(),
+                  providers: config.providers,
+                  previousState: previousWatchRef.current || []
+                });
+              } finally {
+                setIsExecuting(false);
+              }
+            }
+          };
+          
+          // Execute immediately
+          executeIdleAction();
+          
+          // Set up repeat interval if configured
+          if (config.idle.repeat && config.idle.interval) {
+            idleIntervalRef.current = setInterval(executeIdleAction, config.idle.interval);
+          }
+        }, config.idle.timeout);
+      }
     }
 
     previousWatchRef.current = currentValues;
@@ -131,10 +185,23 @@ export function useReactiveAI<T = any>(
     setIsExecuting(false);
   }, []);
 
+  // Cleanup idle timers on unmount
+  useEffect(() => {
+    return () => {
+      if (idleTimerRef.current) {
+        clearTimeout(idleTimerRef.current);
+      }
+      if (idleIntervalRef.current) {
+        clearInterval(idleIntervalRef.current);
+      }
+    };
+  }, []);
+
   return {
     isReady,
     isExecuting,
     lastError,
+    isIdle,
     addAction,
     removeAction,
     reset

@@ -21,12 +21,10 @@ function App() {
   const [ready, setReady] = useState(false);
   const [triggerCount, setTriggerCount] = useState(0);
   const [conversationHistory, setConversationHistory] = useState([]);
-  const [lastInteraction, setLastInteraction] = useState(Date.now());
-  const [isIdle, setIsIdle] = useState(false);
+  const [idleTrigger, setIdleTrigger] = useState(0); // Simple state that changes to simulate idle
   
   const debounceTimer = useRef(null);
-  const idleTimer = useRef(null);
-  const ponderingTimer = useRef(null);
+  const lastInputTime = useRef(Date.now());
 
   // API key will be injected by the server
   const apiKey = process.env.GEMINI_API_KEY;
@@ -53,56 +51,30 @@ function App() {
     }, 1000);
   }, []);
 
-  // Track user activity
-  const updateActivity = () => {
-    setLastInteraction(Date.now());
-    setIsIdle(false);
-    
-    // Clear existing idle timer
-    if (idleTimer.current) {
-      clearTimeout(idleTimer.current);
-    }
-    
-    // Set new idle timer (5 seconds)
-    idleTimer.current = setTimeout(() => {
-      setIsIdle(true);
-    }, 5000);
-  };
-
-  // Pondering timer - sprite checks in when idle
+  // Simple idle simulation - increment idle trigger every 5 seconds when user is inactive
   useEffect(() => {
-    if (!isIdle || !ready || isExecuting) return;
-
-    // Clear any existing pondering timer
-    if (ponderingTimer.current) {
-      clearInterval(ponderingTimer.current);
-    }
-
-    // Ponder immediately when becoming idle
-    const ponderNow = async () => {
-      if (!isExecuting && apiKey) {
-        const idlePrompt = IDLE_PROMPTS[Math.floor(Math.random() * IDLE_PROMPTS.length)];
-        await generateResponse(idlePrompt, true);
+    const interval = setInterval(() => {
+      const now = Date.now();
+      const timeSinceLastInput = now - lastInputTime.current;
+      
+      // If user hasn't typed for 5 seconds, trigger idle
+      if (timeSinceLastInput > 5000 && ready) {
+        setIdleTrigger(prev => prev + 1);
       }
-    };
+    }, 5000);
 
-    // Initial ponder
-    ponderNow();
-
-    // Then set up interval for pondering every 5 seconds while idle
-    ponderingTimer.current = setInterval(ponderNow, 5000);
-
-    return () => {
-      if (ponderingTimer.current) {
-        clearInterval(ponderingTimer.current);
-      }
-    };
-  }, [isIdle, ready, isExecuting]);
+    return () => clearInterval(interval);
+  }, [ready]);
 
   // Generate AI response
   const generateResponse = async (prompt, isIdleCheck = false) => {
     if (!apiKey || apiKey === '') {
       setError('No API key found. Please set GEMINI_API_KEY environment variable.');
+      return;
+    }
+
+    // Prevent concurrent executions
+    if (isExecuting) {
       return;
     }
 
@@ -159,11 +131,25 @@ function App() {
     }
   };
 
-  // The magic: React to input changes automatically!
+  // The magic: React to BOTH input changes AND idle triggers!
   useEffect(() => {
-    if (!ready || !userInput.trim()) return;
+    if (!ready) return;
 
-    updateActivity();
+    // Check if this is an idle trigger
+    if (idleTrigger > 0) {
+      // Don't trigger idle if already executing
+      if (!isExecuting && apiKey) {
+        const idlePrompt = IDLE_PROMPTS[Math.floor(Math.random() * IDLE_PROMPTS.length)];
+        generateResponse(idlePrompt, true);
+      }
+      return;
+    }
+
+    // Otherwise, it's a user input change
+    if (!userInput.trim()) return;
+
+    // Update last input time
+    lastInputTime.current = Date.now();
 
     // Clear existing timer
     if (debounceTimer.current) {
@@ -181,7 +167,7 @@ function App() {
         clearTimeout(debounceTimer.current);
       }
     };
-  }, [userInput, ready]);
+  }, [userInput, idleTrigger, ready]);
 
   return (
     <div className="app">
@@ -207,7 +193,7 @@ function App() {
           <div className="stat">
             <span className="stat-label">State</span>
             <span className="stat-value">
-              {isExecuting ? '🦋 Weaving Magic' : isIdle ? '👁️ Observing' : '🍃 Listening'}
+              {isExecuting ? '🦋 Weaving Magic' : idleTrigger > 0 ? '👁️ Observing' : '🍃 Listening'}
             </span>
           </div>
         </div>
@@ -223,7 +209,7 @@ function App() {
               value={userInput}
               onChange={(e) => {
                 setUserInput(e.target.value);
-                updateActivity();
+                lastInputTime.current = Date.now();
               }}
               placeholder="Ask about magic, nature, or any mystery that intrigues you..."
               disabled={!ready}
@@ -236,7 +222,7 @@ function App() {
 
           <div className="response-section">
             <h3>{SPRITE_NAME} Speaks</h3>
-            <div className={`response-box ${isExecuting ? 'executing' : ''} ${isIdle ? 'pondering' : ''}`}>
+            <div className={`response-box ${isExecuting ? 'executing' : ''} ${idleTrigger > 0 ? 'pondering' : ''}`}>
               {response || (
                 <span className="placeholder">
                   {isExecuting ? `${SPRITE_NAME} gathers ethereal wisdom...` : 'The forest awaits your words...'}
